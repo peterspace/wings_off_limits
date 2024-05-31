@@ -70,13 +70,79 @@ app.get("/.well-known/apple-app-site-association", (req, res) => {
 // call this on initializing app to fetch back the original link that is needed for tracking user
 // because in the associated domain, we may not have th full path, but only the root domain https://www.dmtgames.pro
 
+// app.get("/game", (req, res) => {
+//   const facebookLink = process.env.FACEBOOK_FULL_LINK;
+//   const installed = "true";
+//   const newLink = facebookLink + `&installed=${installed}`;
+//   console.log(newLink);
+//   res.json(newLink);
+// });
+
 app.get("/game", (req, res) => {
+  const { sub1, sub2, sub3, sub4, sub5, sub6, sub7, sub8 } = req.query;
+
+  let subs = [];
+  let sub1B = null;
+  let sub2B = null;
+  let sub3B = null;
+  let sub4B = null;
+  let sub5B = null;
+  let sub6B = null;
+  let sub7B = null;
+  let sub8B = null;
+
+  if (sub1) {
+    subs.push(sub1);
+    sub1B = sub1;
+  }
+  if (sub2) {
+    subs.push(sub2);
+    sub2B = sub2;
+  }
+  if (sub3) {
+    subs.push(sub3);
+    sub3B = sub3;
+  }
+  if (sub4) {
+    subs.push(sub4);
+    sub4B = sub4;
+  }
+  if (sub5) {
+    subs.push(sub5);
+    sub5B = sub5;
+  }
+  if (sub6) {
+    subs.push(sub6);
+    sub6B = sub6;
+  }
+  if (sub7) {
+    subs.push(sub7);
+    sub7B = sub7;
+  }
+  if (sub8) {
+    subs.push(sub8);
+    sub8B = sub8;
+  }
+
+  console.log({ subs });
+
+  console.log({
+    sub1B,
+    sub2B,
+    sub3B,
+    sub4B,
+    sub5B,
+    sub6B,
+    sub7B,
+    sub8B,
+  });
   const facebookLink = process.env.FACEBOOK_FULL_LINK;
   const installed = "true";
   const newLink = facebookLink + `&installed=${installed}`;
   console.log(newLink);
   res.json(newLink);
 });
+
 
 app.get("/installed", (req, res) => {
   const facebookLink = process.env.FACEBOOK_FULL_LINK;
