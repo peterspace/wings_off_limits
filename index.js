@@ -1,11 +1,12 @@
 const dotenv = require("dotenv").config();
 const express = require("express");
+const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
 const { errorHandler } = require("./middleware/errorMiddleware.js");
+const User = require("./models/User.js");
 const app = express();
-
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -32,27 +33,93 @@ app.use(
 // -momery unleaked---------
 app.set("trust proxy", 1);
 
+const backend = process.env.BACKEND_URL;
+const app_id = process.env.FACEBOOK_APP_ID;
+const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
+
 //Step1: initial path
-app.get("/", (req, res) => {
-  const { installed } = req.query;
 
-  // go to appstore to install app if not already installed
-  if (installed != "true") {
-    const appStoreLink = process.env.APP_STORE_LINK;
+// const link1 =
+//   "https://www.dmtgames.pro/?sub1=NPR&sub2=291735090&fbp=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD";
+// const link2 =
+//   "https://www.dmtgames.pro/?sub1=NPR&fbp=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD";
+// const link3 =
+//   "https://www.dmtgames.pro/?sub1=NPR&sub2=291735090&sub3=NPR&sub4=vidos1&sub5={{ad.id}}&sub6=method1&fbp=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD";
 
-    res.redirect(appStoreLink);
+app.get("/", async (req, res) => {
+  //======{request objects}====================================
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
+  const requestURL = req.originalUrl; // This will include query parameters, if any
+  const { advertiser_tracking_id } = req.query;
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL });
+  console.log({ Query: req.query });
+
+  //============{state variables}====================================
+
+  let updatedLink = backend + requestURL;
+  let facebookLink = "";
+
+  //============{data iterations}====================================
+  // Check if user email already exists
+  const userExists = await User.findOne({ ipAddress: ip });
+  const userTrackingIdExists = await User.findOne({
+    advertiserTrackingId: advertiser_tracking_id,
+  });
+
+  if (!userExists) {
+    console.log("new user");
+
+    const newUser = await User.create({
+      ipAddress: ip,
+      userLink: updatedLink,
+    });
+
+    if (newUser) {
+      facebookLink = updatedLink;
+      console.log({ "New user created": newUser });
+      const appStoreLink = process.env.APP_STORE_LINK;
+      console.log("app install in progress");
+      return res.redirect(appStoreLink);
+    }
   }
 
-  console.log("app redirect successful");
+  if (userExists && advertiser_tracking_id && !userTrackingIdExists) {
+    userExists.advertiserTrackingId =
+      advertiser_tracking_id || userExists.advertiserTrackingId;
 
-  const facebookLink = process.env.FACEBOOK_FULL_LINK;
+    const updatedUser = await userExists.save();
 
-  const newLink = facebookLink + `&installed=${installed}`;
+    if (updatedUser) {
+      console.log({ "User updated": updatedUser });
+      facebookLink = userExists.userLink;
+      res.json(facebookLink);
+    }
+  } else if (userTrackingIdExists) {
+    console.log("user exists");
+    facebookLink = userTrackingIdExists.userLink;
+    console.log("app launch successful");
+    console.log({ marketerLink: facebookLink });
 
-  res.json(newLink);
+    res.json(facebookLink);
+  } else {
+    console.log("user exists");
+    facebookLink = userExists.userLink;
+    console.log("app launch successful");
+    console.log({ marketerLink: facebookLink });
+    res.json(facebookLink);
+  }
 });
 
 //set marketers link inside app
+
+// office
 
 //AASA file path//https://www.dmtgames.pro/.well-known/apple-app-site-association
 //associated domain: applinks:www.dmtgames.pro
@@ -66,98 +133,37 @@ app.get("/.well-known/apple-app-site-association", (req, res) => {
   res.sendFile(__dirname + "/apple-app-site-association.json");
 });
 
-//step3: on app launch
-// call this on initializing app to fetch back the original link that is needed for tracking user
-// because in the associated domain, we may not have th full path, but only the root domain https://www.dmtgames.pro
-
-// app.get("/game", (req, res) => {
-//   const facebookLink = process.env.FACEBOOK_FULL_LINK;
-//   const installed = "true";
-//   const newLink = facebookLink + `&installed=${installed}`;
-//   console.log(newLink);
-//   res.json(newLink);
-// });
-
-app.get("/game", (req, res) => {
-  const { sub1, sub2, sub3, sub4, sub5, sub6, sub7, sub8 } = req.query;
-
-  let subs = [];
-  let sub1B = null;
-  let sub2B = null;
-  let sub3B = null;
-  let sub4B = null;
-  let sub5B = null;
-  let sub6B = null;
-  let sub7B = null;
-  let sub8B = null;
-
-  if (sub1) {
-    subs.push(sub1);
-    sub1B = sub1;
-  }
-  if (sub2) {
-    subs.push(sub2);
-    sub2B = sub2;
-  }
-  if (sub3) {
-    subs.push(sub3);
-    sub3B = sub3;
-  }
-  if (sub4) {
-    subs.push(sub4);
-    sub4B = sub4;
-  }
-  if (sub5) {
-    subs.push(sub5);
-    sub5B = sub5;
-  }
-  if (sub6) {
-    subs.push(sub6);
-    sub6B = sub6;
-  }
-  if (sub7) {
-    subs.push(sub7);
-    sub7B = sub7;
-  }
-  if (sub8) {
-    subs.push(sub8);
-    sub8B = sub8;
-  }
-
-  console.log({ subs });
-
-  console.log({
-    sub1B,
-    sub2B,
-    sub3B,
-    sub4B,
-    sub5B,
-    sub6B,
-    sub7B,
-    sub8B,
-  });
-  const facebookLink = process.env.FACEBOOK_FULL_LINK;
-  const installed = "true";
-  const newLink = facebookLink + `&installed=${installed}`;
-  console.log(newLink);
-  res.json(newLink);
-});
-
-
-app.get("/installed", (req, res) => {
-  const facebookLink = process.env.FACEBOOK_FULL_LINK;
-  const installed = "true";
-  const newLink = facebookLink + `&installed=${installed}`;
-  console.log(newLink);
-  res.redirect(newLink);
-});
-
 app.get("/track_app_installs", async (req, res) => {
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
   const { advertiser_tracking_id } = req.query;
+
+  if (advertiser_tracking_id) {
+    console.log({ advertiser_tracking_id });
+  }
   console.log("checking installs");
 
-  const app_id = process.env.FACEBOOK_APP_ID;
-  const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
+  const userExists = await User.findOne({ ipAddress: ip });
+
+  if (userExists) {
+    console.log({ userExists });
+  }
+
+  //save advertiser_tracking_id to user database on first app launch
+  if (userExists && !userExists.advertiserTrackingId) {
+    userExists.advertiserTrackingId =
+      advertiser_tracking_id || userExists.advertiserTrackingId;
+
+    const updatedUser = await userExists.save();
+
+    if (updatedUser) {
+      console.log({ "User updated": updatedUser });
+    }
+  }
 
   if (advertiser_tracking_id) {
     console.log({ advertiser_tracking_id });
@@ -168,14 +174,32 @@ app.get("/track_app_installs", async (req, res) => {
 
       if (response.data) {
         let result = response.data;
+
         console.log({ result });
+        //{ result: { success: true } }
       }
+      //====={New update}========================
     } catch (error) {
+      // const err = error.response.data;
       console.log(error);
+      // return { status: err.success, message: err.message };
+      // res.json(err);
     }
   }
-  // const advertiser_tracking_id = ""
 });
+
+// fetch all users
+app.get("/all_users", async (req, res) => {
+  const allUsers = await User.find();
+
+  if (allUsers) {
+    console.log({ allUsers });
+    res.status(200).json(allUsers);
+  }
+});
+
+//fbp and token
+//token
 
 // Error Middleware
 app.use(errorHandler);
@@ -186,3 +210,13 @@ const server = app.listen(PORT, () => {
   console.log(`Server Running on port ${PORT}`);
 });
 
+mongoose
+  .connect(process.env.MONGO_URL)
+  .then(() => {
+    server;
+  })
+  .catch((err) => console.log(err));
+
+//Time for facebook implementation
+//The getTime method returns the time in milliseconds.
+//const unixTimeNow = Math.floor(new Date().getTime() / 1000.0);
