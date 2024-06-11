@@ -219,7 +219,7 @@ app.get("/track_app_installs", async (req, res) => {
       application_tracking_enabled: 1,
       custom_events: [
         {
-          _eventName: "fb_mobile_activate_app",
+          _eventName: "fb_mobile_install",
         },
       ],
       user_data: {
