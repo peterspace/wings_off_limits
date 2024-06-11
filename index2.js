@@ -108,7 +108,9 @@ app.get("/", async (req, res) => {
     // res.json(err);
   }
 
-  if (!userExists) {
+  if (!userExists && sub1) {
+    // sub1 must be constant
+
     console.log("new user");
 
     const newUser = await User.create({
@@ -120,12 +122,15 @@ app.get("/", async (req, res) => {
       facebookLink = updatedLink;
       console.log({ "New user created": newUser });
       const appStoreLink = process.env.APP_STORE_LINK;
-      console.log("app install in progress");
       return res.redirect(appStoreLink);
     }
   }
 
-  if (advertiser_tracking_id && !userExists.advertiserTrackingId) {
+  if (
+    userExists &&
+    advertiser_tracking_id &&
+    !userExists.advertiserTrackingId
+  ) {
     userExists.advertiserTrackingId =
       advertiser_tracking_id || userExists.advertiserTrackingId;
 
@@ -133,20 +138,14 @@ app.get("/", async (req, res) => {
 
     if (updatedUser) {
       console.log({ "User updated": updatedUser });
-      facebookLink = userExists.userLink;
     }
   } else if (userTrackingIdExists) {
     console.log("user exists");
     facebookLink = userTrackingIdExists.userLink;
-    console.log("app launch successful");
-    console.log({ marketerLink: facebookLink });
   } else {
     console.log("user exists");
-    facebookLink = userExists?.userLink ? userExists?.userLink : backend;
-    console.log("app launch successful");
-    console.log({ marketerLink: facebookLink });
+    facebookLink = userExists.userLink;
   }
-
   console.log("sending link");
   newLink = facebookLink;
 
