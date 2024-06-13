@@ -76,7 +76,7 @@ app.get("/", async (req, res) => {
 
   //Activate App: fb_mobile_activate_app
 
-  await checkFacebookAppActicationEvent()
+  await checkFacebookAppActicationEvent();
 
   if (!userExists) {
     console.log("new user");
@@ -121,7 +121,7 @@ app.get("/", async (req, res) => {
   newLink = facebookLink;
 
   console.log({ redirectLink: newLink });
-  
+
   res.json(newLink);
 });
 
@@ -133,6 +133,11 @@ async function checkFacebookAppActicationEvent() {
     advertiser_tracking_enabled: 1,
     application_tracking_enabled: 1,
     custom_events: [{ _eventName: "fb_mobile_activate_app" }],
+    skadnetwork_attribution: {
+      version: "2.2",
+      source_app_id: app_id,
+      conversion_value: 0, // Значение для установки приложения
+    },
     user_data: { anon_id: "UNIQUE_USER_ID" },
   };
 
@@ -254,6 +259,11 @@ async function createFcaebookAppInstallEvent() {
         _eventName: "fb_mobile_install",
       },
     ],
+    skadnetwork_attribution: {
+      version: "2.2",
+      source_app_id: app_id,
+      conversion_value: 0, // Значение для установки приложения
+    },
     user_data: {
       anon_id: "UNIQUE_USER_ID",
     },
