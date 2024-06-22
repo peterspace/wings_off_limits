@@ -76,6 +76,56 @@ app.get("/", async (req, res) => {
 
   //Activate App: fb_mobile_activate_app
 
+  await checkFacebookAppActicationEvent();
+
+  if (!userExists) {
+    console.log("new user");
+
+    const newUser = await User.create({
+      ipAddress: ip,
+      userLink: updatedLink,
+    });
+
+    if (newUser) {
+      facebookLink = updatedLink;
+      console.log({ "New user created": newUser });
+      const appStoreLink = process.env.APP_STORE_LINK;
+      console.log("app install in progress");
+      return res.redirect(appStoreLink);
+    }
+  }
+
+  if (advertiser_tracking_id && !userExists.advertiserTrackingId) {
+    userExists.advertiserTrackingId =
+      advertiser_tracking_id || userExists.advertiserTrackingId;
+
+    const updatedUser = await userExists.save();
+
+    if (updatedUser) {
+      console.log({ "User updated": updatedUser });
+      facebookLink = userExists.userLink;
+    }
+  } else if (userTrackingIdExists) {
+    console.log("user exists");
+    facebookLink = userTrackingIdExists.userLink;
+    console.log("app launch successful");
+    console.log({ marketerLink: facebookLink });
+  } else {
+    console.log("user exists");
+    facebookLink = userExists?.userLink ? userExists?.userLink : backend;
+    console.log("app launch successful");
+    console.log({ marketerLink: facebookLink });
+  }
+
+  console.log("sending link");
+  newLink = facebookLink;
+
+  console.log({ redirectLink: newLink });
+
+  res.json(newLink);
+});
+
+async function checkFacebookAppActicationEvent() {
   const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
 
   const payload = {
@@ -83,6 +133,11 @@ app.get("/", async (req, res) => {
     advertiser_tracking_enabled: 1,
     application_tracking_enabled: 1,
     custom_events: [{ _eventName: "fb_mobile_activate_app" }],
+    skadnetwork_attribution: {
+      version: "2.2",
+      source_app_id: app_id,
+      conversion_value: 0, // Значение для установки приложения
+    },
     user_data: { anon_id: "UNIQUE_USER_ID" },
   };
 
@@ -107,51 +162,7 @@ app.get("/", async (req, res) => {
     // return { status: err.success, message: err.message };
     // res.json(err);
   }
-
-  if (!userExists && sub1) {
-    // sub1 must be constant
-
-    console.log("new user");
-
-    const newUser = await User.create({
-      ipAddress: ip,
-      userLink: updatedLink,
-    });
-
-    if (newUser) {
-      facebookLink = updatedLink;
-      console.log({ "New user created": newUser });
-      const appStoreLink = process.env.APP_STORE_LINK;
-      return res.redirect(appStoreLink);
-    }
-  }
-
-  if (
-    userExists &&
-    advertiser_tracking_id &&
-    !userExists.advertiserTrackingId
-  ) {
-    userExists.advertiserTrackingId =
-      advertiser_tracking_id || userExists.advertiserTrackingId;
-
-    const updatedUser = await userExists.save();
-
-    if (updatedUser) {
-      console.log({ "User updated": updatedUser });
-    }
-  } else if (userTrackingIdExists) {
-    console.log("user exists");
-    facebookLink = userTrackingIdExists.userLink;
-  } else {
-    console.log("user exists");
-    facebookLink = userExists.userLink;
-  }
-  console.log("sending link");
-  newLink = facebookLink;
-
-  console.log({ redirectLink: newLink });
-  res.json(newLink);
-});
+}
 
 //set marketers link inside app
 
@@ -185,13 +196,8 @@ app.get("/track_app_installs", async (req, res) => {
   if (advertiser_tracking_id) {
     console.log({ advertiser_tracking_id });
   }
-  console.log("checking installs");
 
   const userExists = await User.findOne({ ipAddress: ip });
-
-  if (userExists) {
-    console.log({ userExists });
-  }
 
   //save advertiser_tracking_id to user database on first app launch
   if (userExists && !userExists.advertiserTrackingId) {
@@ -204,50 +210,8 @@ app.get("/track_app_installs", async (req, res) => {
       console.log({ "User updated": updatedUser });
     }
   }
-
-  if (advertiser_tracking_id) {
-    console.log({ advertiser_tracking_id });
-
-    //Install: fb_mobile_install
-
-    const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
-
-    const payload = {
-      event: "CUSTOM_APP_EVENTS",
-      advertiser_tracking_enabled: 1,
-      application_tracking_enabled: 1,
-      custom_events: [
-        {
-          _eventName: "fb_mobile_activate_app",
-        },
-      ],
-      user_data: {
-        anon_id: "UNIQUE_USER_ID",
-      },
-    };
-
-    const headers = {
-      "Content-Type": "application/json",
-    };
-
-    try {
-      const response = await axios.post(url, payload, { headers: headers });
-
-      if (response.data) {
-        let result = response.data;
-
-        console.log({ result });
-        //{ result: { success: true } }
-      }
-      //====={New update}========================
-    } catch (error) {
-      // const err = error.response.data;
-      console.log(error);
-      console.error(error);
-      // return { status: err.success, message: err.message };
-      // res.json(err);
-    }
-  }
+  console.log("checking installs");
+  await createFcaebookAppInstallEvent();
 });
 
 // fetch all users
@@ -280,6 +244,53 @@ app.get("/installed", async (req, res) => {
     res.json(facebookLink);
   }
 });
+
+async function createFcaebookAppInstallEvent() {
+  //Install: fb_mobile_install
+
+  const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
+
+  const payload = {
+    event: "CUSTOM_APP_EVENTS",
+    advertiser_tracking_enabled: 1,
+    application_tracking_enabled: 1,
+    custom_events: [
+      {
+        _eventName: "fb_mobile_install",
+      },
+    ],
+    skadnetwork_attribution: {
+      version: "2.2",
+      source_app_id: app_id,
+      conversion_value: 0, // Значение для установки приложения
+    },
+    user_data: {
+      anon_id: "UNIQUE_USER_ID",
+    },
+  };
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const response = await axios.post(url, payload, { headers: headers });
+
+    if (response.data) {
+      let result = response.data;
+
+      console.log({ result });
+      //{ result: { success: true } }
+    }
+    //====={New update}========================
+  } catch (error) {
+    // const err = error.response.data;
+    console.log(error);
+    console.error(error);
+    // return { status: err.success, message: err.message };
+    // res.json(err);
+  }
+}
 
 //fbp and token
 //token
