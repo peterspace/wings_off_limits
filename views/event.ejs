@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Track Events</title>
+    <script>
+      // Load Facebook Pixel base code
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '714981180129689'); // Use your actual Pixel ID
+      fbq('track', 'PageView');
+
+      // Function to trigger events
+      function trackEvent(eventName, eventData) {
+        fbq('track', eventName, eventData);
+      }
+
+      // Trigger the event on page load
+      document.addEventListener('DOMContentLoaded', () => {
+        const eventType = '<%= eventType %>';
+        const eventData = <%- JSON.stringify(eventData) %>;
+
+        console.log(`${eventType.charAt(0).toUpperCase() + eventType.slice(1)} Data:`, eventData);
+        trackEvent(eventType.charAt(0).toUpperCase() + eventType.slice(1), eventData);
+      });
+    </script>
+  </head>
+  <body>
+    <h1>Track <%= eventType %> Event</h1>
+  </body>
+</html>

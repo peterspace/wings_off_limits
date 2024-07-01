@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
+const crypto = require("crypto");
+const path = require("path");
 const { errorHandler } = require("./middleware/errorMiddleware.js");
 const User = require("./models/User.js");
 const app = express();
@@ -33,9 +35,19 @@ app.use(
 // -momery unleaked---------
 app.set("trust proxy", 1);
 
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
 const backend = process.env.BACKEND_URL;
+
+//=============={Facebook Pixel Info}==========================
+const pixelId = process.env.FACEBOOK_PIXEL_ID; // Replace with your actual Pixel ID
+const accessToken = process.env.FACEBOOK_PIXEL_ACCESS_TOKEN; // Replace with your actual access token
+
+//================{Facebook App Info}===================================
 const app_id = process.env.FACEBOOK_APP_ID;
 const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
+//=======================================================================
 
 //Step1: initial path
 
@@ -76,7 +88,7 @@ app.get("/", async (req, res) => {
 
   //Activate App: fb_mobile_activate_app
 
-  await checkFacebookAppActicationEvent();
+  await checkFacebookAppActivationEvent();
 
   if (!userExists) {
     console.log("new user");
@@ -148,45 +160,6 @@ app.get("/", async (req, res) => {
 
   res.json(newLink);
 });
-
-async function checkFacebookAppActicationEvent() {
-  const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
-
-  const payload = {
-    event: "CUSTOM_APP_EVENTS",
-    advertiser_tracking_enabled: 1,
-    application_tracking_enabled: 1,
-    custom_events: [{ _eventName: "fb_mobile_activate_app" }],
-    skadnetwork_attribution: {
-      version: "2.2",
-      source_app_id: app_id,
-      conversion_value: 0, // Значение для установки приложения
-    },
-    user_data: { anon_id: "UNIQUE_USER_ID" },
-  };
-
-  const headers = {
-    "Content-Type": "application/json",
-  };
-
-  try {
-    const response = await axios.post(url, payload, { headers: headers });
-
-    if (response.data) {
-      let result = response.data;
-
-      console.log({ result });
-      //{ result: { success: true } }
-    }
-    //====={New update}========================
-  } catch (error) {
-    // const err = error.response.data;
-    console.log(error);
-    console.error(error);
-    // return { status: err.success, message: err.message };
-    // res.json(err);
-  }
-}
 
 //set marketers link inside app
 
@@ -269,6 +242,53 @@ app.get("/installed", async (req, res) => {
   }
 });
 
+/**
+ * 
+ *
+ The SKAdNetwork is specific to app attribution on iOS devices and is used in the context of app installs and post-install events, 
+ primarily for tracking and attribution of ad-driven installs.
+ */
+
+//================={mobile app events using facebook app id credentials}========================================
+async function checkFacebookAppActivationEvent() {
+  const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
+
+  const payload = {
+    event: "CUSTOM_APP_EVENTS",
+    advertiser_tracking_enabled: 1,
+    application_tracking_enabled: 1,
+    custom_events: [{ _eventName: "fb_mobile_activate_app" }],
+    skadnetwork_attribution: {
+      version: "2.2",
+      source_app_id: app_id,
+      conversion_value: 0, // Значение для установки приложения
+    },
+    user_data: { anon_id: "UNIQUE_USER_ID" },
+  };
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const response = await axios.post(url, payload, { headers: headers });
+
+    if (response.data) {
+      let result = response.data;
+
+      console.log({ result });
+      //{ result: { success: true } }
+    }
+    //====={New update}========================
+  } catch (error) {
+    // const err = error.response.data;
+    console.log(error);
+    console.error(error);
+    // return { status: err.success, message: err.message };
+    // res.json(err);
+  }
+}
+
 async function createFacebookAppInstallEvent() {
   //Install: fb_mobile_install
 
@@ -286,7 +306,7 @@ async function createFacebookAppInstallEvent() {
     skadnetwork_attribution: {
       version: "2.2",
       source_app_id: app_id,
-      conversion_value: 0, // Значение для установки приложения
+      conversion_value: 0,
     },
     user_data: {
       anon_id: "UNIQUE_USER_ID",
@@ -316,21 +336,161 @@ async function createFacebookAppInstallEvent() {
   }
 }
 
-//fbp and token
-//token
-
+//================={website events using facebook pixel id credentials}========================================
 //keitaro postback
-//  "https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&date={date:U}&client_ip_address={_ip}";
-//  "http://localhost:4000/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&date={date:U}&client_ip_address={_ip}";
-//  "http://localhost:4000/create_facebook_purchase_event?fbclid=user123&sub_id_10=abcdefg&external_id=user123&date={date:U}&client_ip_address={_ip}";
+//https://www.dmtgames.pro/create_facebook_purchase_event?fbclid={subid}&external_id={subid}&campaign_name={campaign_name}&campaign_id={campaign_id}&=true&visitor_code={visitor_code}&user_agent={user_agent}&ip={ip}&offer_id={offer_id}&os={os}&region={region}&city={city}&source={source}
 
-/**
- * 
- //keitaro postback without date and client_ip_address
-//  "https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&client_ip_address={_ip}";
-//  "http://localhost:4000/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&client_ip_address={_ip}";
-//  "http://localhost:4000/create_facebook_purchase_event?fbclid=user123&sub_id_10=abcdefg&external_id=user123&client_ip_address={_ip}";
- */
+// Helper function to hash data
+function hashData(data) {
+  return crypto.createHash("sha256").update(data).digest("hex");
+}
+
+//https://www.dmtgames.pro/create_facebook_purchase_event?fbclid=user123&external_id=user123&value=10
+//http://localhost:4000/create_facebook_purchase_event?fbclid=user123&external_id=user123&value=10
+// Endpoint to receive purchase information from an external website using and create Facebook purchase event
+
+app.get("/track_facebook_purchase_event", (req, res) => {
+  const purchaseData = req.query; // using query strings
+  console.log({ purchaseData });
+  app.locals.purchaseData = purchaseData;
+  console.log({ message: "Purchase information received" });
+  //create_facebook_purchase_event
+  createFacebookEvent("Purchase", purchaseData, req, res);
+});
+
+// Endpoint to receive lead information from an external website and create Facebook lead event
+app.get("/track_facebook_lead_event", (req, res) => {
+  const leadData = req.query; // using query strings
+  console.log({ leadData });
+  app.locals.leadData = leadData;
+  console.log({ message: "Lead information received" });
+  //create_facebook_lead_event
+  createFacebookEvent("Lead", leadData, req, res);
+});
+
+//=========={Not mandatory}==========================================
+// Endpoint to get purchase information
+app.get("/get_purchase_info", (req, res) => {
+  const purchaseData = app.locals.purchaseData;
+  if (purchaseData) {
+    res.status(200).json(purchaseData);
+  } else {
+    res.status(404).json({ message: "No purchase information available" });
+  }
+});
+
+// Endpoint to get lead information
+app.get("/get_lead_info", (req, res) => {
+  const leadData = app.locals.leadData;
+  if (leadData) {
+    res.status(200).json(leadData);
+  } else {
+    res.status(404).json({ message: "No lead information available" });
+  }
+});
+
+// Function to create Facebook event
+async function createFacebookEvent(eventType, eventData, req, res) {
+  console.log("creating Facebook Event in progress");
+  const {
+    fbclid,
+    external_id,
+    date,
+    client_ip_address,
+    client_user_agent,
+    email,
+    phone,
+    first_name,
+    last_name,
+    city,
+    state,
+    zip_code,
+    country,
+    value,
+    currency,
+    source,
+  } = eventData;
+  const ip =
+    client_ip_address ||
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
+  const unixTimeNow = Math.floor(Date.now() / 1000);
+
+  const min = 1;
+  const max = 9999;
+  let randomNumberFloat = Math.random() * (max - min) + min;
+  const random = Math.round(randomNumberFloat);
+  const payload = {
+    data: [
+      {
+        event_name: eventType,
+        event_time: date || unixTimeNow,
+        action_source: "website",
+        event_source_url: source || "https://av-gameprivacypolicy.site/app",
+        user_data: {
+          client_ip_address: client_ip_address || ip,
+          client_user_agent: client_user_agent || req.headers["user-agent"],
+          fbc: `fb.1.${date || unixTimeNow}.${fbclid ? fbclid : "abcdefg"}`,
+          fbp: `fb.1.${date || unixTimeNow}.${random}`,
+          fbclid: fbclid ? fbclid : null, // Include fbclid if available
+          em: email ? hashData(email) : null,
+          ph: phone ? hashData(phone) : null,
+          fn: first_name ? hashData(first_name) : null,
+          ln: last_name ? hashData(last_name) : null,
+          ct: city ? hashData(city) : null,
+          st: state ? hashData(state) : null,
+          zp: zip_code ? hashData(zip_code) : null,
+          country: country ? hashData(country) : null,
+        },
+        custom_data: {
+          currency: currency || "USD",
+          value: value || 0,
+          external_id: external_id || "user123",
+        },
+      },
+    ],
+    access_token: accessToken,
+  };
+
+  console.log({ payload });
+  console.log({ data: payload?.data ? payload.data : payload });
+  console.log({
+    user_data: payload.data[0]?.user_data ? payload.data[0].user_data : null,
+  });
+
+  const url = `https://graph.facebook.com/v10.0/${pixelId}/events`;
+
+  try {
+    const response = await axios.post(url, payload, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (response.data) {
+      const result = response.data;
+      console.log({ [`${eventType}_event_result`]: result });
+      res.render("event", { eventType, eventData });
+    }
+  } catch (error) {
+    console.log({ [`${eventType}_event_error`]: error });
+    if (error.response) {
+      console.error("Error response data:", error.response.data);
+      console.error("Error response status:", error.response.status);
+      console.error("Error response headers:", error.response.headers);
+      res.status(error.response.status).json(error.response.data);
+    } else if (error.request) {
+      console.error("Error request data:", error.request);
+      res.status(500).json({ message: "No response received from Facebook" });
+    } else {
+      console.error("Error message:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  }
+}
+
+//=============={Keitaro events}============================================
 
 app.get("/create_facebook_purchase_event", async (req, res) => {
   //Install: fb_mobile_install
@@ -523,19 +683,6 @@ app.get("/create_facebook_leads_event", async (req, res) => {
     }
   }
 });
-
-/**
- * Returns the current UNIX timestamp.
- *
- * @returns {Number}
- */
-async function unixTimestamp() {
-  return Math.floor(Date.now() / 1000);
-}
-
-async function randomNumber(min, max) {
-  return Math.random() * (max - min) + min;
-}
 
 // Error Middleware
 app.use(errorHandler);
