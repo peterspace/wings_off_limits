@@ -461,7 +461,8 @@ async function createFacebookEvent(eventType, eventData, req, res) {
     user_data: payload.data[0]?.user_data ? payload.data[0].user_data : null,
   });
 
-  const url = `https://graph.facebook.com/v10.0/${pixelId}/events`;
+  // const url = `https://graph.facebook.com/v10.0/${pixelId}/events`;
+  const url = `https://graph.facebook.com/${pixelId}/events`;
 
   try {
     const response = await axios.post(url, payload, {
