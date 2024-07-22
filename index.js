@@ -8,7 +8,7 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
 const { errorHandler } = require("./middleware/errorMiddleware.js");
-const { scrapeLogic } = require("./scrapeLogic");
+const { getCountryCode } = require("./countryCodes.js");
 
 const User = require("./models/User.js");
 const app = express();
@@ -61,9 +61,11 @@ app.use((req, res, next) => {
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 const backend = process.env.BACKEND_URL;
-const frontend = process.env.FRONTEND_URL;
 const app_id = process.env.FACEBOOK_APP_ID;
 const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
+
+const pixelId = process.env.FACEBOOK_PIXEL_ID;
+const pixel_access_token = process.env.FACEBOOK_PIXEL_ACCESS_TOKEN;
 
 // const facebookAppId = process.env.FACEBOOK_APP_ID;
 // const facebookAppSecret = process.env.FACEBOOK_APP_SECRET;
@@ -76,8 +78,14 @@ const googleLink = process.env.GOOGLELINK;
 // Connect to DB and start server
 
 // Helper function to hash data
+//Step1: initial path
+
 function hashData(data) {
-  return crypto.createHash("sha256").update(data).digest("hex");
+  if (!data) return null;
+  return crypto
+    .createHash("sha256")
+    .update(data.trim().toLowerCase())
+    .digest("hex");
 }
 
 //testing purchase call from server
@@ -95,6 +103,22 @@ async function sendPurchaseOnServer() {
   }
 }
 
+async function fetchCountryCode() {
+  // Example usage:
+  // const countryName = "United States";
+  const countryName = "Pakistan";
+  const countryCode = getCountryCode(countryName);
+  let hashedCountryCode = null;
+
+  if (countryCode) {
+    console.log(`Normalized format: ${countryCode}`);
+    hashedCountryCode = hashData(countryCode);
+    console.log(`Hashed format: ${hashedCountryCode}`);
+  } else {
+    console.log("Country not found");
+  }
+}
+
 // sendPurchaseOnServer();
 
 //http://localhost:4000/create_facebook_purchase_event?fbclid=123&value=25
@@ -103,33 +127,6 @@ async function sendPurchaseOnServer() {
 //http://localhost:4000/create_facebook_lead_event?fbclid=123&external_id=user125
 
 // Endpoint to create Facebook purchase event
-app.get("/create_facebook_purchase_event", async (req, res) => {
-  const event = "purchase";
-  const { client_user_agent, client_ip_address, fbclid, external_id } =
-    req.query;
-  console.log({ serverParams: req.query });
-  // http://localhost:5173/purchase/123/user245
-  let url = "";
-
-  if (client_user_agent && client_ip_address && fbclid && external_id) {
-    url = `${frontend}/${event}/${client_user_agent}/${client_ip_address}/${fbclid}/${external_id}`;
-  }
-
-  if (!client_user_agent && client_ip_address && fbclid && external_id) {
-    url = `${frontend}/${event}/${client_ip_address}/${fbclid}/${external_id}`;
-  }
-
-  if (!client_user_agent && !client_ip_address && fbclid && external_id) {
-    url = `${frontend}/${event}/${fbclid}/${external_id}`;
-  }
-
-  if (!client_user_agent && !client_ip_address && !fbclid && external_id) {
-    url = `${frontend}/${event}/${external_id}`;
-  }
-
-  console.log({ "Purchase Redirect Url": url });
-  scrapeLogic(url);
-});
 
 // async function checkPuppeteer(){
 //   let url = "https://www.google.com/"
@@ -138,7 +135,7 @@ app.get("/create_facebook_purchase_event", async (req, res) => {
 // checkPuppeteer()
 //testing lead directly
 async function sendLeadOnServer() {
-  const url = `${backend}/create_facebook_lead_event?fbclid=123&external_id=user125`;
+  const url = `${backend}/create_facebook_leads_event?fbclid=123&external_id=user125`;
 
   try {
     const response = await axios.get(url);
@@ -151,35 +148,6 @@ async function sendLeadOnServer() {
 }
 
 // sendLeadOnServer();
-
-// Endpoint to create Facebook lead event
-app.get("/create_facebook_lead_event", async (req, res) => {
-  const event = "lead";
-  const { client_user_agent, client_ip_address, fbclid, external_id } =
-    req.query;
-  console.log({ serverParams: req.query });
-  // http://localhost:5173/lead/123/user245
-  let url = "";
-
-  if (client_user_agent && client_ip_address && fbclid && external_id) {
-    url = `${frontend}/${event}/${client_user_agent}/${client_ip_address}/${fbclid}/${external_id}`;
-  }
-
-  if (!client_user_agent && client_ip_address && fbclid && external_id) {
-    url = `${frontend}/${event}/${client_ip_address}/${fbclid}/${external_id}`;
-  }
-
-  if (!client_user_agent && !client_ip_address && fbclid && external_id) {
-    url = `${frontend}/${event}/${fbclid}/${external_id}`;
-  }
-
-  if (!client_user_agent && !client_ip_address && !fbclid && external_id) {
-    url = `${frontend}/${event}/${external_id}`;
-  }
-
-  console.log({ "Lead Redirect Url": url });
-  scrapeLogic(url);
-});
 
 // Endpoint to create Facebook lead event
 app.get("/facebook_event_notification", async (req, res) => {
@@ -304,7 +272,7 @@ app.get("/", async (req, res) => {
   });
 
   //Activate App: fb_mobile_activate_app
-  // await checkFacebookAppActicationEvent();
+  await checkFacebookAppActivationEvent();
 
   //==================={New User}========================
 
@@ -459,7 +427,12 @@ app.get("/track_app_installs", async (req, res) => {
     }
   }
   console.log("checking installs");
-  await createFacebookAppInstallEvent();
+  await createFacebookAppInstallEvent(req);
+});
+
+app.get("/test_app_installs", async (req, res) => {
+  console.log("checking installs");
+  await createFacebookAppInstallEvent(req, res);
 });
 
 // fetch all users
@@ -493,7 +466,11 @@ app.get("/installed", async (req, res) => {
   }
 });
 
-async function createFacebookAppInstallEvent() {
+async function createFacebookAppInstallEvent(req) {
+  await createFacebookMobileAppInstallEvent();
+  // await createFacebookPixelAppInstallEvent(req);
+}
+async function createFacebookMobileAppInstallEvent() {
   //Install: fb_mobile_install
 
   const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
@@ -537,6 +514,530 @@ async function createFacebookAppInstallEvent() {
     console.error(error);
     // return { status: err.success, message: err.message };
     // res.json(err);
+  }
+}
+
+async function createFacebookPixelAppInstallEvent(req) {
+  const ip = req.clientIp;
+  let status = false;
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL: req.originalUrl });
+  console.log({ Query: req.query });
+
+  const unixTimeNow = Math.floor(Date.now() / 1000);
+  console.log({ unixTimeNow });
+
+  const min = 1;
+  const max = 9999;
+  let randomNumberFloat = Math.random() * (max - min) + min;
+
+  const random = Math.round(randomNumberFloat);
+  console.log({ random });
+
+  if (unixTimeNow && random) {
+    console.log({ processing: "calling facebook endpoint" });
+
+    const url = `https://graph.facebook.com/v11.0/${pixelId}/events?access_token=${pixel_access_token}`;
+
+    const payload = {
+      data: [
+        {
+          event_name: "AppInstall",
+          event_time: unixTimeNow,
+          // action_source: "website",
+          // event_source_url: "https://av-gameprivacypolicy.site/app",
+          action_source: "app",
+          event_source_url: process.env.APP_STORE_LINK,
+          event_id: `event_${unixTimeNow}_${random}`, // add this to pixel data on landing page
+          user_data: {
+            client_ip_address: ip,
+            client_user_agent:
+              req.headers["user-agent"] ||
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          },
+          app_data: {
+            advertiser_tracking_enabled: 1,
+            application_tracking_enabled: 1,
+          },
+        },
+      ],
+    };
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    try {
+      const response = await axios.post(url, payload, { headers: headers });
+
+      if (response.data) {
+        let result = response.data;
+        console.log({ FB_app_install_event_result: result });
+        status = true;
+      }
+    } catch (error) {
+      console.log({ FB_app_install_event_error: error });
+      status = false;
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response headers:", error.response.headers);
+      } else if (error.request) {
+        console.error("Error request data:", error.request);
+      } else {
+        console.error("Error message:", error.message);
+      }
+      status = false;
+    }
+  }
+  return status;
+}
+
+async function checkFacebookAppActivationEvent() {
+  const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
+
+  const payload = {
+    event: "CUSTOM_APP_EVENTS",
+    advertiser_tracking_enabled: 1,
+    application_tracking_enabled: 1,
+    custom_events: [{ _eventName: "fb_mobile_activate_app" }],
+    skadnetwork_attribution: {
+      version: "2.2",
+      source_app_id: app_id,
+      conversion_value: 0, // Значение для установки приложения
+    },
+    user_data: { anon_id: "UNIQUE_USER_ID" },
+  };
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  try {
+    const response = await axios.post(url, payload, { headers: headers });
+
+    if (response.data) {
+      let result = response.data;
+
+      console.log({ result });
+      //{ result: { success: true } }
+    }
+    //====={New update}========================
+  } catch (error) {
+    // const err = error.response.data;
+    console.log(error);
+    console.error(error);
+    // return { status: err.success, message: err.message };
+    // res.json(err);
+  }
+}
+
+//fbp and token
+//token
+
+//keitaro postback
+//  "https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&date={date:U}&client_ip_address={_ip}";
+//  "http://localhost:4000/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&date={date:U}&client_ip_address={_ip}";
+//  "http://localhost:4000/create_facebook_purchase_event?fbclid=user123&sub_id_10=abcdefg&external_id=user123&date={date:U}&client_ip_address={_ip}";
+
+/**
+ * 
+ //keitaro postback without date and client_ip_address
+//  "https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&client_ip_address={_ip}";
+//  "http://localhost:4000/create_facebook_purchase_event?fbclid={fbclid}&sub_id_10={_sub_id_10}&external_id={subid}&client_ip_address={_ip}";
+//  "http://localhost:4000/create_facebook_purchase_event?fbclid=user123&sub_id_10=abcdefg&external_id=user123&client_ip_address={_ip}";
+//https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid=user123&sub_id_10=abcdefg&external_id=user123
+ */
+
+//https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid={subid}&external_id={subid}&campaign_name={campaign_name}&campaign_id={campaign_id}&=true&visitor_code={visitor_code}&user_agent={user_agent}&ip={ip}&offer_id={offer_id}&os={os}&region={region}&city={city}&source={source}
+app.get("/create_facebook_purchase_event", async (req, res) => {
+  await facebookAppPurchaseEvent(req, res);
+  await facebookPixelPurchaseEvent(req, res);
+});
+
+//https://www.wingsofflimits.pro/create_facebook_leads_event?fbclid={subid}&external_id={subid}&campaign_name={campaign_name}&campaign_id={campaign_id}&=true&visitor_code={visitor_code}&user_agent={user_agent}&ip={ip}&offer_id={offer_id}&os={os}&region={region}&city={city}&source={source}
+
+app.get("/create_facebook_leads_event", async (req, res) => {
+  await facebookAppLeadEvent(req, res);
+  await facebookPixelLeadEvent(req, res);
+});
+
+async function facebookAppLeadEvent(req, res) {
+  //Install: fb_mobile_install
+
+  const requestURL = req.originalUrl; // This will include query parameters, if any
+  const { fbclid, sub_id_10, external_id, date, client_ip_address } = req.query;
+
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL });
+  console.log({ Query: req.query });
+
+  // const sub_id_10 = "";
+  const unixTimeNow = Math.floor(Date.now() / 1000);
+
+  const min = 1;
+  const max = 9999;
+  let random = Math.random() * (max - min) + min;
+
+  // Function to generate random number
+
+  if (unixTimeNow && random) {
+    const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
+
+    const payload = {
+      event: "CUSTOM_APP_EVENTS",
+      advertiser_tracking_enabled: 1,
+      application_tracking_enabled: 1,
+      advertiser_id: "1234",
+      action_source: "website",
+      event_time: date || unixTimeNow,
+      event_source_url: "https://av-gameprivacypolicy.site/app",
+      custom_events: [
+        {
+          // _eventName: "fb_mobile_purchase",
+          _eventName: "Lead", // Standard event name for leads
+          _valueToSum: 0,
+          fb_currency: "USD",
+        },
+      ],
+      skadnetwork_attribution: {
+        version: "2.2",
+        source_app_id: app_id,
+        // conversion_value: 0,
+        conversion_value: 1,
+      },
+      user_data: {
+        external_id: external_id ? external_id.toString() : "user123",
+        client_ip_address: client_ip_address || ip,
+        client_user_agent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        // fbc: "fb.1.1625247600.abcdefg",
+        // fbp: "fb.1.1625247600.1234",
+        fbc: `fb.1.${date || unixTimeNow}.${sub_id_10 ? sub_id_10 : "abcdefg"}`,
+        fbp: `fb.1.${date || unixTimeNow}.${random}`,
+        fbclid: fbclid || null, // Include fbclid if available
+      },
+    };
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    try {
+      const response = await axios.post(url, payload, { headers: headers });
+
+      if (response.data) {
+        let result = response.data;
+
+        console.log({ FB_purchase_event_result: result });
+        //{ result: { success: true } }
+      }
+      //====={New update}========================
+    } catch (error) {
+      // const err = error.response.data;
+      console.log({ FB_purchase_event_error: error });
+      console.error(error);
+      // return { status: err.success, message: err.message };
+      // res.json(err);
+    }
+  }
+}
+
+async function facebookAppPurchaseEvent(req, res) {
+  //Install: fb_mobile_install
+
+  const requestURL = req.originalUrl; // This will include query parameters, if any
+  const { fbclid, sub_id_10, external_id, date, client_ip_address } = req.query;
+
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL });
+  console.log({ Query: req.query });
+
+  // const sub_id_10 = "";
+  const unixTimeNow = Math.floor(Date.now() / 1000);
+  console.log({ unixTimeNow });
+
+  const min = 1;
+  const max = 9999;
+  let randomNumberFloat = Math.random() * (max - min) + min;
+
+  const random = Math.round(randomNumberFloat);
+  console.log({ random });
+
+  // Function to generate random number
+
+  if (unixTimeNow && random) {
+    console.log({ processing: "calling facebook endpoint" });
+    const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
+
+    const payload = {
+      event: "CUSTOM_APP_EVENTS",
+      advertiser_tracking_enabled: 1,
+      application_tracking_enabled: 1,
+      advertiser_id: "1234",
+      action_source: "website",
+      event_time: date || unixTimeNow,
+      event_source_url: "https://av-gameprivacypolicy.site/app",
+      custom_events: [
+        {
+          _eventName: "fb_mobile_purchase",
+          // _eventName: "Purchase", // Standard event name for purchases
+          _valueToSum: 10,
+          fb_currency: "USD",
+        },
+      ],
+      skadnetwork_attribution: {
+        version: "2.2",
+        source_app_id: app_id,
+        // conversion_value: 0,
+        conversion_value: 1,
+      },
+      user_data: {
+        external_id: external_id ? external_id.toString() : "user123",
+        // client_ip_address: client_ip_address || ip,
+        client_ip_address: client_ip_address || "192.168.1.1",
+        client_user_agent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        // fbc: "fb.1.1625247600.abcdefg",
+        // fbp: "fb.1.1625247600.1234",
+        fbc: `fb.1.${date || unixTimeNow}.${sub_id_10 ? sub_id_10 : "abcdefg"}`,
+        fbp: `fb.1.${date || unixTimeNow}.${random}`,
+        fbclid: fbclid || null, // Include fbclid if available
+      },
+    };
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    try {
+      const response = await axios.post(url, payload, { headers: headers });
+
+      if (response.data) {
+        let result = response.data;
+
+        console.log({ FB_purchase_event_result: result });
+        //{ result: { success: true } }
+      }
+      //====={New update}========================
+    } catch (error) {
+      // const err = error.response.data;
+      console.log({ FB_purchase_event_error: error });
+      // console.error(error);
+      if (error.response) {
+        // Server responded with a status code outside the range of 2xx
+        console.error("Error response data:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response headers:", error.response.headers);
+      } else if (error.request) {
+        // No response received
+        console.error("Error request data:", error.request);
+      } else {
+        // Something else happened
+        console.error("Error message:", error.message);
+      }
+    }
+  }
+}
+
+async function facebookPixelLeadEvent(req, res) {
+  const {
+    // fbclid,
+    sub_id_10,
+    external_id,
+    date,
+    client_ip_address,
+    phone,
+    email,
+    country,
+    event_id,
+  } = req.query;
+
+  const ip = req.clientIp;
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL: req.originalUrl });
+  console.log({ Query: req.query });
+
+  const unixTimeNow = Math.floor(Date.now() / 1000);
+  console.log({ unixTimeNow });
+
+  const min = 1;
+  const max = 9999;
+  let randomNumberFloat = Math.random() * (max - min) + min;
+
+  const random = Math.round(randomNumberFloat);
+  console.log({ random });
+
+  if (unixTimeNow && random) {
+    console.log({ processing: "calling facebook endpoint" });
+
+    const url = `https://graph.facebook.com/v11.0/${pixelId}/events?access_token=${pixel_access_token}`;
+
+    const payload = {
+      data: [
+        {
+          event_name: "Lead",
+          event_time: date
+            ? Math.floor(new Date(date).getTime() / 1000)
+            : unixTimeNow,
+          action_source: "website",
+          event_source_url: "https://av-gameprivacypolicy.site/app",
+          event_id: event_id || `event_${unixTimeNow}_${random}`, // add this to pixel data on landing page
+          user_data: {
+            external_id: external_id
+              ? [hashData(external_id.toString())]
+              : [hashData("12345")],
+
+            client_ip_address: client_ip_address || ip,
+            client_user_agent:
+              req.headers["user-agent"] ||
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            fbc: `fb.1.${date || unixTimeNow}.${
+              sub_id_10 ? sub_id_10 : "abcdefg"
+            }`,
+            fbp: `fb.1.${date || unixTimeNow}.${random}`,
+            em: email ? [hashData(email.toString())] : null, // Hash and place email in array
+            ph: phone ? [hashData(phone.toString())] : null, // Hash and place phone in array
+            country: country ? [hashData(country.toString())] : null, // Hash and place country in array//[hashData("us")]
+          },
+        },
+      ],
+    };
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    try {
+      const response = await axios.post(url, payload, { headers: headers });
+
+      if (response.data) {
+        let result = response.data;
+        console.log({ FB_lead_event_result: result });
+      }
+    } catch (error) {
+      console.log({ FB_lead_event_error: error });
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response headers:", error.response.headers);
+      } else if (error.request) {
+        console.error("Error request data:", error.request);
+      } else {
+        console.error("Error message:", error.message);
+      }
+    }
+  }
+}
+
+async function facebookPixelPurchaseEvent(req, res) {
+  const {
+    // fbclid,
+    sub_id_10,
+    external_id,
+    date,
+    client_ip_address,
+    phone,
+    email,
+    country,
+    event_id,
+  } = req.query;
+
+  const ip = req.clientIp;
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL: req.originalUrl });
+  console.log({ Query: req.query });
+
+  const unixTimeNow = Math.floor(Date.now() / 1000);
+  console.log({ unixTimeNow });
+
+  const min = 1;
+  const max = 9999;
+  let randomNumberFloat = Math.random() * (max - min) + min;
+
+  const random = Math.round(randomNumberFloat);
+  console.log({ random });
+
+  if (unixTimeNow && random) {
+    console.log({ processing: "calling facebook endpoint" });
+
+    const pixelId = process.env.FACEBOOK_PIXEL_ID; // Replace with your Pixel ID
+    const accessToken = process.env.FACEBOOK_PIXEL_ACCESS_TOKEN; // Replace with your Access Token
+
+    const url = `https://graph.facebook.com/v11.0/${pixelId}/events?access_token=${accessToken}`;
+
+    const payload = {
+      data: [
+        {
+          event_name: "Purchase",
+          event_time: date
+            ? Math.floor(new Date(date).getTime() / 1000)
+            : unixTimeNow,
+          action_source: "website",
+          event_source_url: "https://av-gameprivacypolicy.site/app",
+          event_id: event_id || `event_${unixTimeNow}_${random}`, // add this to pixel data on landing page
+          user_data: {
+            external_id: external_id ? external_id.toString() : "user123",
+            client_ip_address: client_ip_address || ip,
+            client_user_agent:
+              req.headers["user-agent"] ||
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            fbc: `fb.1.${date || unixTimeNow}.${
+              sub_id_10 ? sub_id_10 : "abcdefg"
+            }`,
+            fbp: `fb.1.${date || unixTimeNow}.${random}`,
+            em: email ? [hashData(email.toString())] : null, // Hash and place email in array
+            ph: phone ? [hashData(phone.toString())] : null, // Hash and place phone in array
+            country: country ? [hashData(country.toString())] : null, // Hash and place country in array//[hashData("us")]
+          },
+          custom_data: {
+            currency: "USD",
+            value: 10.0,
+          },
+        },
+      ],
+    };
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+
+    try {
+      const response = await axios.post(url, payload, { headers: headers });
+
+      if (response.data) {
+        let result = response.data;
+        console.log({ FB_purchase_event_result: result });
+      }
+    } catch (error) {
+      console.log({ FB_purchase_event_error: error });
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response headers:", error.response.headers);
+      } else if (error.request) {
+        console.error("Error request data:", error.request);
+      } else {
+        console.error("Error message:", error.message);
+      }
+    }
   }
 }
 
