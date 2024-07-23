@@ -178,9 +178,15 @@ app.get("/facebook_event_notification", async (req, res) => {
 
 //=================++++{keitaro endpoint }=================================================
 
-const getKeitaroSecondLinkWithUser = async (req, url, userData) => {
+const getKeitaroSecondLinkWithUser = async (
+  req,
+  url,
+  advertiser_tracking_id,
+  userData
+) => {
+  console.log({ url, advertiser_tracking_id });
   let link = "";
-  const defaultRequestURL = `/?sub_id_1=NPR&sub_id_2=236462910&sub_id_3=NPR&pixel=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD&domain=https://av-gameprivacypolicy.site/app`; // if there is no request url, then the user is an organic user
+
   const userExists = userData;
 
   try {
@@ -203,16 +209,14 @@ const getKeitaroSecondLinkWithUser = async (req, url, userData) => {
 
       if (link.startsWith("http://") || link.startsWith("https://")) {
         console.log("The string starts with 'http' or 'https'.");
-        // link = link; // without params
-        link = link + defaultRequestURL; // adding affiliate link
+        link = link; // without params
         console.log({
           stage4: "sending keitaro campaign 2 link with params if available",
         });
 
-        // if (userExists && userExists.affiliateLink) {
-        //   // link = link + `${userExists?.affiliateLink}`; // adding affiliate link
-        //   link = link + defaultRequestURL; // adding affiliate link
-        // }
+        if (userExists && userExists.affiliateLink) {
+          link = link + `${userExists?.affiliateLink}`; // adding affiliate link
+        }
       } else {
         console.log({
           stage5: "return non https value but html for other countries",
@@ -252,8 +256,6 @@ app.get("/", async (req, res) => {
   const requestURL = req.originalUrl; // This will include query parameters, if any
   const { advertiser_tracking_id } = req.query;
 
-  const defaultRequestURL = `/?sub_id_1=NPR&sub_id_2=236462910&sub_id_3=NPR&pixel=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD&domain=https://av-gameprivacypolicy.site/app`; // if there is no request url, then the user is an organic user
-
   console.log({ userIPAddress: ip });
   console.log({ requestURL });
   console.log({ Query: req.query });
@@ -283,8 +285,8 @@ app.get("/", async (req, res) => {
     console.log("new user");
     const newUser = await User.create({
       ipAddress: ip,
-      // affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
-      affiliateLink: defaultRequestURL,
+      // userLink: updatedLink,
+      affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
     });
 
     if (newUser) {
@@ -305,8 +307,7 @@ app.get("/", async (req, res) => {
     const newUser = await User.create({
       ipAddress: ip,
       // userLink: updatedLink,
-      // affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
-      affiliateLink: defaultRequestURL,
+      affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
       advertiserTrackingId: advertiser_tracking_id,
     });
 
@@ -328,30 +329,42 @@ app.get("/", async (req, res) => {
 
     if (updatedUser) {
       console.log({ "User updated": updatedUser });
+      let updated_advertiser_tracking_id = advertiser_tracking_id
+        ? advertiser_tracking_id
+        : "";
       const userData = updatedUser;
       facebookLink = await getKeitaroSecondLinkWithUser(
         req,
         keitaroFirstCampaign,
+        updated_advertiser_tracking_id,
         userData
       );
     }
   } else if (userTrackingIdExists) {
     console.log("user exists");
+    let updated_advertiser_tracking_id = advertiser_tracking_id
+      ? advertiser_tracking_id
+      : "";
 
     const userData = userTrackingIdExists;
     facebookLink = await getKeitaroSecondLinkWithUser(
       req,
       keitaroFirstCampaign,
+      updated_advertiser_tracking_id,
       userData
     );
     console.log("app launch successful");
     console.log({ marketerLink: facebookLink });
   } else {
     console.log("user exists");
+    let updated_advertiser_tracking_id = advertiser_tracking_id
+      ? advertiser_tracking_id
+      : "";
     const userData = userExists;
     facebookLink = await getKeitaroSecondLinkWithUser(
       req,
       keitaroFirstCampaign,
+      updated_advertiser_tracking_id,
       userData
     );
 
