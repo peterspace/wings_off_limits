@@ -480,6 +480,8 @@ app.get("/", async (req, res) => {
   console.log({ Query: req.query });
 
   //============{state variables}====================================
+  let facebookLink = backend + defaultRequestURL;
+
   //============{data iterations}====================================
   // Check if user email already exists
   const userExists = await User.findOne({ ipAddress: ip });
@@ -490,17 +492,13 @@ app.get("/", async (req, res) => {
   //Activate App: fb_mobile_activate_app
 
   await checkFacebookAppActivationEvent();
-  const newUserPath = sub_id_1 ? requestURL : defaultRequestURL;
-  const newUserURL = backend + newUserPath;
-  //backend
 
   if (!userExists) {
     console.log("new user");
 
     const newUser = await User.create({
       ipAddress: ip,
-      // userLink: sub_id_1 ? requestURL : defaultRequestURL,
-      userLink: newUserURL,
+      userLink: sub_id_1 ? requestURL : defaultRequestURL,
     });
 
     if (newUser) {
@@ -544,7 +542,8 @@ app.get("/", async (req, res) => {
       console.log({ "User updated": updatedUser });
 
       console.log("sending link");
-      const newLink = updatedUser?.userLink;
+      const facebookLink1 = backend + updatedUser?.userLink;
+      const newLink = facebookLink1;
 
       console.log({ redirectLink: newLink });
 
@@ -552,10 +551,12 @@ app.get("/", async (req, res) => {
     }
   } else if (userTrackingIdExists) {
     console.log("user exists with advertiser id");
+    console.log({ marketerLink: facebookLink });
 
     console.log("sending link");
 
-    const newLink = userTrackingIdExists?.userLink;
+    const facebookLink2 = backend + userTrackingIdExists?.userLink;
+    const newLink = facebookLink2;
 
     console.log({ linkWithAdvertiserId: newLink });
 
@@ -563,14 +564,23 @@ app.get("/", async (req, res) => {
   } else {
     console.log("old user exists");
     console.log("app launch successful");
+    console.log({ marketerLink: facebookLink });
 
     console.log("sending link");
-    const newLink = userExists?.userLink;
+    const facebookLink3 = backend + userExists?.userLink;
+    const newLink = facebookLink3;
 
     console.log({ oldUserRedirectLink: newLink });
 
     res.json(newLink);
   }
+
+  // console.log("sending link");
+  // newLink = facebookLink;
+
+  // console.log({ redirectLink: newLink });
+
+  // res.json(newLink);
 });
 
 //set marketers link inside app
