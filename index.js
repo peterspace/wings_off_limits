@@ -573,6 +573,57 @@ app.get("/", async (req, res) => {
   }
 });
 
+app.get("/register", async (req, res) => {
+  //======{request objects}====================================
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
+  const requestURL = req.originalUrl; // This will include query parameters, if any
+  const { sub_id_1 } = req.query;
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL });
+  console.log({ Query: req.query });
+
+  const path = requestURL; //"/register/?sub_id_1=NPR&sub_id_2=NPR";
+  const newPath = path.replace("/register", "");
+  console.log({ newPath }); // Output: "/?sub_id_1=NPR&sub_id_2=NPR"
+
+  //============{state variables}====================================
+  //============{data iterations}====================================
+  // Check if user email already exists
+  const userExists = await User.findOne({ ipAddress: ip });
+
+  //Activate App: fb_mobile_activate_app
+
+  await checkFacebookAppActivationEvent();
+  const newUserPath2 = sub_id_1 ? newPath : defaultRequestURL;
+  const newUserURL = backend + newUserPath2;
+  //backend
+
+  if (!userExists) {
+    console.log("new user");
+
+    const newUser = await User.create({
+      ipAddress: ip,
+      // userLink: sub_id_1 ? requestURL : defaultRequestURL,
+      userLink: newUserURL,
+    });
+
+    if (newUser) {
+      console.log({ "New user created": newUser });
+      const appStoreLink = process.env.APP_STORE_LINK;
+      console.log("app install in progress");
+      return res.redirect(appStoreLink);
+    }
+  } else {
+    return res.redirect(appStoreLink);
+  }
+});
+
 //set marketers link inside app
 
 // office
