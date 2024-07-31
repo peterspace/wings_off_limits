@@ -620,6 +620,8 @@ app.get("/register", async (req, res) => {
       return res.redirect(appStoreLink);
     }
   } else {
+    const appStoreLink = process.env.APP_STORE_LINK;
+    console.log("app install in progress");
     return res.redirect(appStoreLink);
   }
 });
