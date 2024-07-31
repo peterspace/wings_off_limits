@@ -652,8 +652,8 @@ app.get("/installed", async (req, res) => {
   // if only advertiser tracking id exists
   if (userExists) {
     console.log("only ip exists");
-    // const facebookLink = userExists.userLink;
-    let facebookLink = backend + defaultRequestURL;
+    const facebookLink = userExists.userLink;
+    // let facebookLink = backend + defaultRequestURL;
 
     console.log({ installedLink: facebookLink });
     // res.redirect(newLink);
