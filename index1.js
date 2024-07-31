@@ -75,6 +75,7 @@ const pixel_access_token = process.env.FACEBOOK_PIXEL_ACCESS_TOKEN;
 const keitaroFirstCampaign = process.env.KEITAROFIRSTCAMPAIGN;
 const activeGame = process.env.ACTIVEGAMELINK;
 const googleLink = process.env.GOOGLELINK;
+const defaultRequestURL = process.env.DEFAULT_REQUEST_URL;
 // Connect to DB and start server
 
 // Helper function to hash data
@@ -178,15 +179,8 @@ app.get("/facebook_event_notification", async (req, res) => {
 
 //=================++++{keitaro endpoint }=================================================
 
-const getKeitaroSecondLinkWithUser = async (
-  req,
-  url,
-  advertiser_tracking_id,
-  userData
-) => {
-  console.log({ url, advertiser_tracking_id });
+const getKeitaroSecondLinkWithUser = async (req, url, userData) => {
   let link = "";
-
   const userExists = userData;
 
   try {
@@ -209,14 +203,16 @@ const getKeitaroSecondLinkWithUser = async (
 
       if (link.startsWith("http://") || link.startsWith("https://")) {
         console.log("The string starts with 'http' or 'https'.");
-        link = link; // without params
+        // link = link; // without params
+        link = link + defaultRequestURL; // adding affiliate link
         console.log({
           stage4: "sending keitaro campaign 2 link with params if available",
         });
 
-        if (userExists && userExists.affiliateLink) {
-          link = link + `${userExists?.affiliateLink}`; // adding affiliate link
-        }
+        // if (userExists && userExists.affiliateLink) {
+        //   // link = link + `${userExists?.affiliateLink}`; // adding affiliate link
+        //   link = link + defaultRequestURL; // adding affiliate link
+        // }
       } else {
         console.log({
           stage5: "return non https value but html for other countries",
@@ -249,10 +245,136 @@ const getKeitaroSecondLinkWithUser = async (
 //   "https://www.wingsofflimits.pro/?sub1=NPR&sub2=291735090&sub3=NPR&sub4=vidos1&sub5={{ad.id}}&sub6=method1&fbp=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD";
 
 // add advertiser_tracking_id to installed API call in unity app
-app.get("/", async (req, res) => {
-  console.log("calling host server");
+
+//Advacned setup
+// app.get("/", async (req, res) => {
+//   console.log("calling host server");
+//   //======{request objects}====================================
+//   const ip = req.clientIp;
+//   const requestURL = req.originalUrl; // This will include query parameters, if any
+//   const { advertiser_tracking_id } = req.query;
+
+//   console.log({ userIPAddress: ip });
+//   console.log({ requestURL });
+//   console.log({ Query: req.query });
+
+//   //============{state variables}====================================
+
+//   let facebookLink = "";
+
+//   //============{data iterations}====================================
+//   // Check if user email already exists
+//   const userExists = await User.findOne({ ipAddress: ip });
+//   const userTrackingIdExists = await User.findOne({
+//     advertiserTrackingId: advertiser_tracking_id,
+//   });
+
+//   //Activate App: fb_mobile_activate_app
+//   await checkFacebookAppActivationEvent();
+
+//   //==================={New User}========================
+
+//   /**
+//    * register user
+//    * redirect user to app store to install app
+//    *
+//    */
+//   if (!userExists) {
+//     console.log("new user");
+//     const newUser = await User.create({
+//       ipAddress: ip,
+//       // affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
+//       affiliateLink: defaultRequestURL,
+//     });
+
+//     if (newUser) {
+//       console.log({ "New user created": newUser });
+//       const appStoreLink = process.env.APP_STORE_LINK;
+//       console.log("app install in progress");
+//       return res.redirect(appStoreLink);
+//     }
+//   }
+
+//   if (
+//     advertiser_tracking_id &&
+//     userTrackingIdExists &&
+//     advertiser_tracking_id != userExists?.advertiserTrackingId
+//   ) {
+//     console.log("new user");
+
+//     const newUser = await User.create({
+//       ipAddress: ip,
+//       // userLink: updatedLink,
+//       // affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
+//       affiliateLink: defaultRequestURL,
+//       advertiserTrackingId: advertiser_tracking_id,
+//     });
+
+//     if (newUser) {
+//       console.log({
+//         "New user created with same ip but new advertiserId": newUser,
+//       });
+//       const appStoreLink = process.env.APP_STORE_LINK;
+//       console.log("app install in progress");
+//       return res.redirect(appStoreLink);
+//     }
+//   }
+
+//   if (advertiser_tracking_id && !userExists.advertiserTrackingId) {
+//     userExists.advertiserTrackingId =
+//       advertiser_tracking_id || userExists.advertiserTrackingId;
+
+//     const updatedUser = await userExists.save();
+
+//     if (updatedUser) {
+//       console.log({ "User updated": updatedUser });
+//       const userData = updatedUser;
+//       facebookLink = await getKeitaroSecondLinkWithUser(
+//         req,
+//         keitaroFirstCampaign,
+//         userData
+//       );
+//     }
+//   } else if (userTrackingIdExists) {
+//     console.log("user exists");
+
+//     const userData = userTrackingIdExists;
+//     facebookLink = await getKeitaroSecondLinkWithUser(
+//       req,
+//       keitaroFirstCampaign,
+//       userData
+//     );
+//     console.log("app launch successful");
+//     console.log({ marketerLink: facebookLink });
+//   } else {
+//     console.log("user exists");
+//     const userData = userExists;
+//     facebookLink = await getKeitaroSecondLinkWithUser(
+//       req,
+//       keitaroFirstCampaign,
+//       userData
+//     );
+
+//     console.log("app launch successful");
+//     console.log({ marketerLink: facebookLink });
+//   }
+
+//   console.log("sending link");
+//   newLink = facebookLink;
+
+//   console.log({ redirectLink: newLink });
+
+//   res.json(newLink);
+// });
+
+app.get("/previos", async (req, res) => {
   //======{request objects}====================================
-  const ip = req.clientIp;
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
   const requestURL = req.originalUrl; // This will include query parameters, if any
   const { advertiser_tracking_id } = req.query;
 
@@ -262,7 +384,8 @@ app.get("/", async (req, res) => {
 
   //============{state variables}====================================
 
-  let facebookLink = "";
+  let updatedLink = backend + requestURL;
+  let facebookLink = backend + defaultRequestURL;
 
   //============{data iterations}====================================
   // Check if user email already exists
@@ -272,21 +395,15 @@ app.get("/", async (req, res) => {
   });
 
   //Activate App: fb_mobile_activate_app
+
   await checkFacebookAppActivationEvent();
 
-  //==================={New User}========================
-
-  /**
-   * register user
-   * redirect user to app store to install app
-   *
-   */
   if (!userExists) {
     console.log("new user");
+
     const newUser = await User.create({
       ipAddress: ip,
-      // userLink: updatedLink,
-      affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
+      userLink: updatedLink,
     });
 
     if (newUser) {
@@ -306,8 +423,7 @@ app.get("/", async (req, res) => {
 
     const newUser = await User.create({
       ipAddress: ip,
-      // userLink: updatedLink,
-      affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
+      userLink: defaultRequestURL,
       advertiserTrackingId: advertiser_tracking_id,
     });
 
@@ -329,45 +445,13 @@ app.get("/", async (req, res) => {
 
     if (updatedUser) {
       console.log({ "User updated": updatedUser });
-      let updated_advertiser_tracking_id = advertiser_tracking_id
-        ? advertiser_tracking_id
-        : "";
-      const userData = updatedUser;
-      facebookLink = await getKeitaroSecondLinkWithUser(
-        req,
-        keitaroFirstCampaign,
-        updated_advertiser_tracking_id,
-        userData
-      );
     }
   } else if (userTrackingIdExists) {
     console.log("user exists");
-    let updated_advertiser_tracking_id = advertiser_tracking_id
-      ? advertiser_tracking_id
-      : "";
-
-    const userData = userTrackingIdExists;
-    facebookLink = await getKeitaroSecondLinkWithUser(
-      req,
-      keitaroFirstCampaign,
-      updated_advertiser_tracking_id,
-      userData
-    );
     console.log("app launch successful");
     console.log({ marketerLink: facebookLink });
   } else {
     console.log("user exists");
-    let updated_advertiser_tracking_id = advertiser_tracking_id
-      ? advertiser_tracking_id
-      : "";
-    const userData = userExists;
-    facebookLink = await getKeitaroSecondLinkWithUser(
-      req,
-      keitaroFirstCampaign,
-      updated_advertiser_tracking_id,
-      userData
-    );
-
     console.log("app launch successful");
     console.log({ marketerLink: facebookLink });
   }
@@ -378,6 +462,125 @@ app.get("/", async (req, res) => {
   console.log({ redirectLink: newLink });
 
   res.json(newLink);
+});
+
+app.get("/", async (req, res) => {
+  //======{request objects}====================================
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
+  const requestURL = req.originalUrl; // This will include query parameters, if any
+  const { sub_id_1, advertiser_tracking_id } = req.query;
+
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL });
+  console.log({ Query: req.query });
+
+  //============{state variables}====================================
+  let facebookLink = backend + defaultRequestURL;
+
+  //============{data iterations}====================================
+  // Check if user email already exists
+  const userExists = await User.findOne({ ipAddress: ip });
+  const userTrackingIdExists = await User.findOne({
+    advertiserTrackingId: advertiser_tracking_id,
+  });
+
+  //Activate App: fb_mobile_activate_app
+
+  await checkFacebookAppActivationEvent();
+
+  if (!userExists) {
+    console.log("new user");
+
+    const newUser = await User.create({
+      ipAddress: ip,
+      userLink: sub_id_1 ? requestURL : defaultRequestURL,
+    });
+
+    if (newUser) {
+      console.log({ "New user created": newUser });
+      const appStoreLink = process.env.APP_STORE_LINK;
+      console.log("app install in progress");
+      return res.redirect(appStoreLink);
+    }
+  }
+
+  // if (
+  //   advertiser_tracking_id &&
+  //   userTrackingIdExists &&
+  //   advertiser_tracking_id != userExists?.advertiserTrackingId
+  // ) {
+  //   console.log("new user");
+
+  //   const newUser = await User.create({
+  //     ipAddress: ip,
+  //     userLink: defaultRequestURL,
+  //     advertiserTrackingId: advertiser_tracking_id,
+  //   });
+
+  //   if (newUser) {
+  //     console.log({
+  //       "New user created with same ip but new advertiserId": newUser,
+  //     });
+  //     const appStoreLink = process.env.APP_STORE_LINK;
+  //     console.log("app install in progress");
+  //     return res.redirect(appStoreLink);
+  //   }
+  // }
+
+  if (advertiser_tracking_id && !userExists.advertiserTrackingId) {
+    userExists.advertiserTrackingId =
+      advertiser_tracking_id || userExists.advertiserTrackingId;
+
+    const updatedUser = await userExists.save();
+
+    if (updatedUser) {
+      console.log({ "User updated": updatedUser });
+
+      console.log("sending link");
+      facebookLink = backend + updatedUser?.userLink;
+      const newLink = facebookLink;
+
+      console.log({ redirectLink: newLink });
+
+      res.json(newLink);
+    }
+  } else if (userTrackingIdExists) {
+    console.log("user exists with advertiser id");
+    console.log({ marketerLink: facebookLink });
+
+    console.log("sending link");
+
+    facebookLink = backend + userTrackingIdExists?.userLink;
+    const newLink = facebookLink;
+
+    console.log({ linkWithAdvertiserId: newLink });
+
+    res.json(newLink);
+  } else {
+    console.log("old user exists");
+    console.log("app launch successful");
+    console.log({ marketerLink: facebookLink });
+
+    console.log("sending link");
+    facebookLink = backend + userExists?.userLink;
+    const newLink = facebookLink;
+
+    console.log({ oldUserRedirectLink: newLink });
+
+    res.json(newLink);
+  }
+
+  // console.log("sending link");
+  // newLink = facebookLink;
+
+  // console.log({ redirectLink: newLink });
+
+  // res.json(newLink);
 });
 
 //set marketers link inside app
@@ -459,7 +662,9 @@ app.get("/installed", async (req, res) => {
   // if only advertiser tracking id exists
   if (userExists) {
     console.log("only ip exists");
-    const facebookLink = userExists.userLink;
+    // const facebookLink = userExists.userLink;
+    let facebookLink = backend + defaultRequestURL;
+
     console.log({ installedLink: facebookLink });
     // res.redirect(newLink);
     res.json(facebookLink);

@@ -542,8 +542,8 @@ app.get("/", async (req, res) => {
       console.log({ "User updated": updatedUser });
 
       console.log("sending link");
-      facebookLink = backend + updatedUser?.userLink;
-      const newLink = facebookLink;
+      const facebookLink1 = backend + updatedUser?.userLink;
+      const newLink = facebookLink1;
 
       console.log({ redirectLink: newLink });
 
@@ -555,8 +555,8 @@ app.get("/", async (req, res) => {
 
     console.log("sending link");
 
-    facebookLink = backend + userTrackingIdExists?.userLink;
-    const newLink = facebookLink;
+    const facebookLink2 = backend + userTrackingIdExists?.userLink;
+    const newLink = facebookLink2;
 
     console.log({ linkWithAdvertiserId: newLink });
 
@@ -567,8 +567,8 @@ app.get("/", async (req, res) => {
     console.log({ marketerLink: facebookLink });
 
     console.log("sending link");
-    facebookLink = backend + userExists?.userLink;
-    const newLink = facebookLink;
+    const facebookLink3 = backend + userExists?.userLink;
+    const newLink = facebookLink3;
 
     console.log({ oldUserRedirectLink: newLink });
 
