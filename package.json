@@ -23,6 +23,6 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.5",
     "nodemailer": "^6.9.14",
-    "nodemailer-smtp-transport": "^2.7.4"
+    "nodemailer-smtp-transport": "^2.4.2"
   }
 }

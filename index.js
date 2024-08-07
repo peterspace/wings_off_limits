@@ -249,15 +249,6 @@ app.get("/track_app_installs", async (req, res) => {
   if (userExists && !userExists.advertiserTrackingId) {
     userExists.advertiserTrackingId =
       advertiser_tracking_id || userExists.advertiserTrackingId;
-
-    const updatedUser = await userExists.save();
-
-    if (updatedUser) {
-      console.log({ "User updated": updatedUser });
-    }
-  }
-
-  if (userExists && !userExists.appsflyer_id) {
     userExists.appsflyer_id = appsflyer_id || userExists.appsflyer_id;
 
     const updatedUser = await userExists.save();
@@ -266,6 +257,7 @@ app.get("/track_app_installs", async (req, res) => {
       console.log({ "User updated": updatedUser });
     }
   }
+
   console.log("checking installs");
 });
 
