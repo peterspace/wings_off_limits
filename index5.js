@@ -76,6 +76,16 @@ const keitaroFirstCampaign = process.env.KEITAROFIRSTCAMPAIGN;
 const activeGame = process.env.ACTIVEGAMELINK;
 const googleLink = process.env.GOOGLELINK;
 const defaultRequestURL = process.env.DEFAULT_REQUEST_URL;
+
+//====={AppsFlyer params}========================================
+const appFlyerId = "id6474070185";
+// const APPSFLYER_URL = 'https://api2.appsflyer.com/inappevent/YOUR_APP_ID';
+const APPSFLYER_URL = `https://api2.appsflyer.com/inappevent/${appFlyerId}`;
+const DEV_KEY = "dZtyX92yUqbeFf3V83upLY"; //'YOUR_DEV_KEY';
+// const DEV_KEY = ""; //'YOUR_DEV_KEY';
+
+//mmp link //https://hq1.appsflyer.com/api/skad/conversion_schema/v1?app_id=id6474070185
+
 // Connect to DB and start server
 
 // Helper function to hash data
@@ -480,8 +490,6 @@ app.get("/", async (req, res) => {
   console.log({ Query: req.query });
 
   //============{state variables}====================================
-  let facebookLink = backend + defaultRequestURL;
-
   //============{data iterations}====================================
   // Check if user email already exists
   const userExists = await User.findOne({ ipAddress: ip });
@@ -492,13 +500,17 @@ app.get("/", async (req, res) => {
   //Activate App: fb_mobile_activate_app
 
   await checkFacebookAppActivationEvent();
+  const newUserPath = sub_id_1 ? requestURL : defaultRequestURL;
+  const newUserURL = backend + newUserPath;
+  //backend
 
   if (!userExists) {
     console.log("new user");
 
     const newUser = await User.create({
       ipAddress: ip,
-      userLink: sub_id_1 ? requestURL : defaultRequestURL,
+      // userLink: sub_id_1 ? requestURL : defaultRequestURL,
+      userLink: newUserURL,
     });
 
     if (newUser) {
@@ -542,8 +554,7 @@ app.get("/", async (req, res) => {
       console.log({ "User updated": updatedUser });
 
       console.log("sending link");
-      facebookLink = backend + updatedUser?.userLink;
-      const newLink = facebookLink;
+      const newLink = updatedUser?.userLink;
 
       console.log({ redirectLink: newLink });
 
@@ -551,12 +562,10 @@ app.get("/", async (req, res) => {
     }
   } else if (userTrackingIdExists) {
     console.log("user exists with advertiser id");
-    console.log({ marketerLink: facebookLink });
 
     console.log("sending link");
 
-    facebookLink = backend + userTrackingIdExists?.userLink;
-    const newLink = facebookLink;
+    const newLink = userTrackingIdExists?.userLink;
 
     console.log({ linkWithAdvertiserId: newLink });
 
@@ -564,23 +573,67 @@ app.get("/", async (req, res) => {
   } else {
     console.log("old user exists");
     console.log("app launch successful");
-    console.log({ marketerLink: facebookLink });
 
     console.log("sending link");
-    facebookLink = backend + userExists?.userLink;
-    const newLink = facebookLink;
+    const newLink = userExists?.userLink;
 
     console.log({ oldUserRedirectLink: newLink });
 
     res.json(newLink);
   }
+});
 
-  // console.log("sending link");
-  // newLink = facebookLink;
+app.get("/register", async (req, res) => {
+  //======{request objects}====================================
+  const ip =
+    req.headers["cf-connecting-ip"] ||
+    req.headers["x-real-ip"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "";
+  const requestURL = req.originalUrl; // This will include query parameters, if any
+  const { sub_id_1 } = req.query;
 
-  // console.log({ redirectLink: newLink });
+  console.log({ userIPAddress: ip });
+  console.log({ requestURL });
+  console.log({ Query: req.query });
 
-  // res.json(newLink);
+  const path = requestURL; //"/register/?sub_id_1=NPR&sub_id_2=NPR";
+  const newPath = path.replace("/register", "");
+  console.log({ newPath }); // Output: "/?sub_id_1=NPR&sub_id_2=NPR"
+
+  //============{state variables}====================================
+  //============{data iterations}====================================
+  // Check if user email already exists
+  const userExists = await User.findOne({ ipAddress: ip });
+
+  //Activate App: fb_mobile_activate_app
+
+  await checkFacebookAppActivationEvent();
+  const newUserPath2 = sub_id_1 ? newPath : defaultRequestURL;
+  const newUserURL = backend + newUserPath2;
+  //backend
+
+  if (!userExists) {
+    console.log("new user");
+
+    const newUser = await User.create({
+      ipAddress: ip,
+      // userLink: sub_id_1 ? requestURL : defaultRequestURL,
+      userLink: newUserURL,
+    });
+
+    if (newUser) {
+      console.log({ "New user created": newUser });
+      const appStoreLink = process.env.APP_STORE_LINK;
+      console.log("app install in progress");
+      return res.redirect(appStoreLink);
+    }
+  } else {
+    const appStoreLink = process.env.APP_STORE_LINK;
+    console.log("app install in progress");
+    return res.redirect(appStoreLink);
+  }
 });
 
 //set marketers link inside app
@@ -662,8 +715,8 @@ app.get("/installed", async (req, res) => {
   // if only advertiser tracking id exists
   if (userExists) {
     console.log("only ip exists");
-    // const facebookLink = userExists.userLink;
-    let facebookLink = backend + defaultRequestURL;
+    const facebookLink = userExists.userLink;
+    // let facebookLink = backend + defaultRequestURL;
 
     console.log({ installedLink: facebookLink });
     // res.redirect(newLink);
@@ -1266,6 +1319,143 @@ async function facebookPixelPurchaseEvent(req, res) {
 //https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid={subid}&external_id={subid}&campaign_name={campaign_name}&campaign_id={campaign_id}&=true&visitor_code={visitor_code}&user_agent={user_agent}&ip={ip}&offer_id={offer_id}&os={os}&region={region}&city={city}&source={source}
 //http://localhost:4000/create_facebook_purchase_event?fbclid=user123&sub_id_10=abcdefg&external_id=user123
 //
+
+//============{Apps flyer events}============================================
+
+const advertiser_tracking_id = "91C52919-58B8-451E-9B20-CBDE97795AD2";
+const custom_ip = "5.17.17.240";
+const custom_user_id = "66b0eb325f47e7748e765739";
+
+const sendEventToAppsFlyer = async (eventData) => {
+  try {
+    const response = await axios.post(APPSFLYER_URL, eventData, {
+      headers: {
+        "Content-Type": "application/json",
+        authentication: DEV_KEY,
+      },
+    });
+    console.log("Event sent successfully:", response.data);
+  } catch (error) {
+    console.error(
+      "Error sending event:",
+      error.response ? error.response.data : error.message
+    );
+  }
+};
+
+const sendFacebookPurchaseEvent = async (userId, purchaseData) => {
+  const purchaseEvent = {
+    appsflyer_id: userId, // mandatory
+    // "idfa": "advertising_id_if_available",// device
+    idfa: purchaseData.idfa,
+    eventName: "af_purchase",
+    eventValue: JSON.stringify({
+      af_revenue: purchaseData.revenue,
+      af_currency: purchaseData.currency,
+      af_order_id: purchaseData.orderId,
+      af_content_type: purchaseData.contentType,
+      af_content_id: purchaseData.contentId,
+    }),
+    eventCurrency: purchaseData.currency,
+    eventTime: new Date().toISOString(),
+    ip: purchaseData.ip,
+  };
+
+  await sendEventToAppsFlyer(purchaseEvent);
+};
+
+const sendFacebookLeadEvent = async (userId, leadData) => {
+  const leadEvent = {
+    appsflyer_id: userId, // mandatory
+    // "idfa": "advertising_id_if_available", // from device
+    idfa: leadData.idfa,
+    eventName: "af_lead",
+    eventValue: JSON.stringify({
+      af_content_type: leadData.contentType,
+      af_content_id: leadData.contentId,
+    }),
+    eventCurrency: "USD", // Assuming default currency for leads
+    eventTime: new Date().toISOString(),
+    ip: leadData.ip,
+  };
+
+  await sendEventToAppsFlyer(leadEvent);
+};
+
+async function testAppsFlyer() {
+  const user_ip = "5.17.17.240";
+  const user_data = await getUserByIPAddress(user_ip);
+
+  if (user_data) {
+    const advertiserTrackingId = user_data?.advertiserTrackingId
+      ? user_data?.advertiserTrackingId
+      : null;
+    const appsflyer_id = user_data?.appsflyer_id
+      ? user_data?.appsflyer_id
+      : null;
+    const purchaseData = {
+      revenue: "99.99",
+      currency: "USD",
+      orderId: "12345",
+      contentType: "product",
+      contentId: "67890",
+      // ip: "192.168.1.1"
+      ip: "5.17.17.240",
+      // idfa: advertiser_tracking_id,
+      idfa: advertiserTrackingId,
+    };
+
+    // await sendFacebookPurchaseEvent(custom_user_id, purchaseData);
+
+    // Example lead data
+    const leadData = {
+      contentType: "sign_up",
+      contentId: "98765",
+      // ip: "192.168.1.1"
+      ip: "5.17.17.240",
+      idfa: advertiser_tracking_id,
+    };
+
+    await sendFacebookLeadEvent(custom_user_id, leadData);
+  }
+}
+
+// testAppsFlyer()
+
+async function getUserByAdvertiserId() {
+  const advertsier_id = advertiser_tracking_id;
+  const userExist = await User.find({
+    advertiserTrackingId: advertsier_id,
+  });
+
+  if (!userExist[0]) {
+    console.log("user does not exist");
+  }
+
+  if (userExist[0]) {
+    console.log({ userExist });
+  }
+}
+
+// getUserByAdvertiserId()
+
+async function getUserByIPAddress(custom_ip) {
+  // const ip_address = custom_ip;
+  const userExist = await User.find({
+    ipAddress: ip_address,
+  });
+
+  if (!userExist[0]) {
+    console.log("user does not exist");
+  }
+
+  if (userExist[0]) {
+    console.log({ userExist });
+    return userExist[0];
+  }
+}
+
+// getUserByIPAddress()
 
 //====={server}===========================================
 const server = app.listen(PORT, () => {
