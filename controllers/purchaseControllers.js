@@ -42,8 +42,11 @@ const testData = {
 const purchaseURL1 =
   "http://localhost:4000/create_facebook_purchase_event?fbclid=37cionlfj9cd&external_id=37cionlfj9cd&campaign_name=iOS+46+%2F+Wings+Off+Limits+%2F+%D0%9E%D1%84%D1%84%D0%B5%D1%80&campaign_id=345&=true&visitor_code=37cionl&user_agent=Mozilla%2F5.0+%28iPhone%3B+CPU+iPhone+OS+17_5_1+like+Mac+OS+X%29+AppleWebKit%2F605.1.15+%28KHTML%2C+like+Gecko%29+Mobile%2F15E148&ip=::ffff:127.0.0.1&offer_id=910&os=iOS&region=NL_ZH&city=Naaldwijk&source=";
 
-  const purchaseURL =
+const purchaseURL =
   "https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid=37cionlfj9cd&external_id=37cionlfj9cd&campaign_name=iOS+46+%2F+Wings+Off+Limits+%2F+%D0%9E%D1%84%D1%84%D0%B5%D1%80&campaign_id=345&=true&visitor_code=37cionl&user_agent=Mozilla%2F5.0+%28iPhone%3B+CPU+iPhone+OS+17_5_1+like+Mac+OS+X%29+AppleWebKit%2F605.1.15+%28KHTML%2C+like+Gecko%29+Mobile%2F15E148&ip=::ffff:127.0.0.1&offer_id=910&os=iOS&region=NL_ZH&city=Naaldwijk";
+
+const purchaseURL2 =
+  "https://www.wingsofflimits.pro/create_facebook_purchase_event?fbclid=37cionlfj9cd&external_id=37cionlfj9cd&campaign_name=iOS+46+%2F+Wings+Off+Limits+%2F+%D0%9E%D1%84%D1%84%D0%B5%D1%80&campaign_id=345&=true&visitor_code=37cionl&user_agent=Mozilla%2F5.0+%28iPhone%3B+CPU+iPhone+OS+17_5_1+like+Mac+OS+X%29+AppleWebKit%2F605.1.15+%28KHTML%2C+like+Gecko%29+Mobile%2F15E148&ip=37.110.31.236&offer_id=910&os=iOS&region=NL_ZH&city=Naaldwijk";
 
 const createPurchaseEvent = async (req, res) => {
   try {
@@ -197,13 +200,10 @@ const sendFacebookLeadEvent = async (userId, leadData) => {
  * _id
  */
 
-const sendFacebookPurchaseEventByAppsFlyer = async (purchaseData) => {
+const sendFacebookPurchaseEventByAppsFlyer = async (purchaseData, user) => {
   //===={get user}=====================
-  const userExist = await User.find({
-    ipAddress: purchaseData.ip,
-  });
-  if (userExist[0]) {
-    const user = userExist[0];
+
+  if (user) {
     const purchaseEvent = {
       appsflyer_id: purchaseData.appsflyer_id, // appsflyer_id
       idfa: user.advertiserTrackingId ? user.advertiserTrackingId : user._id, // advertiser_tracking_id or user_id
@@ -218,8 +218,10 @@ const sendFacebookPurchaseEventByAppsFlyer = async (purchaseData) => {
       eventCurrency: "USD",
       eventTime: new Date().toISOString(),
       ip: purchaseData.ip,
+      bundleIdentifier: process.env.BUNDLE_IDENTIFYER,
+      att: 3,
     };
-
+    console.log({ purchaseEvent });
     await sendEventToAppsFlyer(purchaseEvent);
   } else {
     const advertiser_tracking_id = process.env.CUSTOM_ADVERTISER_TRACKING_ID;
@@ -240,6 +242,8 @@ const sendFacebookPurchaseEventByAppsFlyer = async (purchaseData) => {
       eventCurrency: "USD",
       eventTime: new Date().toISOString(),
       ip: custom_ip,
+      bundleIdentifier: process.env.BUNDLE_IDENTIFYER,
+      att: 3,
     };
 
     await sendEventToAppsFlyer(purchaseEvent);
